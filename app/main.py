@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import os
+
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
 from .schemas import (
     HealthResponse,
@@ -24,14 +26,28 @@ from .router import resolve_route
 from .runtime import run_preflight
 from .postcheck import run_postcheck
 from .telemetry import log_event
-from .graph import build_graph
 
-app = FastAPI(title="Architect Orchestrator", version="0.1.0")
-graph = build_graph()
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").strip()
+RUN_ORCHESTRATOR_ENABLED = os.getenv("RUN_ORCHESTRATOR_ENABLED", "false").lower() == "true"
+RUN_ORCHESTRATOR_PUBLIC = os.getenv("RUN_ORCHESTRATOR_PUBLIC", "false").lower() == "true"
+
+if PUBLIC_BASE_URL:
+    app = FastAPI(
+        title="Architect Orchestrator",
+        version="0.2.0",
+        servers=[{"url": PUBLIC_BASE_URL}],
+    )
+else:
+    app = FastAPI(title="Architect Orchestrator", version="0.2.0")
 
 
 @app.get("/health", response_model=HealthResponse, operation_id="healthCheck")
 def health() -> HealthResponse:
+    return HealthResponse()
+
+
+@app.get("/healthz", response_model=HealthResponse)
+def healthz() -> HealthResponse:
     return HealthResponse()
 
 
@@ -68,28 +84,49 @@ def postcheck_endpoint(payload: PostcheckRequest) -> PostcheckResponse:
     return out
 
 
-@app.post("/orchestrate", response_model=OrchestrateResponse, operation_id="runOrchestrator")
+@app.post(
+    "/orchestrate",
+    response_model=OrchestrateResponse,
+    operation_id="runOrchestrator",
+    include_in_schema=RUN_ORCHESTRATOR_PUBLIC,
+)
 def orchestrate_endpoint(payload: OrchestrateRequest) -> OrchestrateResponse:
-    state = graph.invoke({"text": payload.text})
-    parsed = ParseResponse.model_validate(state["parsed"])
-    route = RouteResponse.model_validate(state["route"])
-    preflight = PreflightResponse.model_validate(state["preflight"])
+    if not RUN_ORCHESTRATOR_ENABLED:
+        raise HTTPException(
+            status_code=503,
+            detail="runOrchestrator disabled in Render-only lite mode",
+        )
 
-    postcheck = None
-    if state.get("postcheck") is not None:
-        postcheck = PostcheckResponse.model_validate(state["postcheck"])
+    try:
+        from .graph import build_graph
 
-    telemetry_events = []
-    if preflight.defect_flags:
-        telemetry_events.extend(preflight.defect_flags)
-    if postcheck and postcheck.events:
-        telemetry_events.extend(postcheck.events)
+        graph = build_graph()
+        state = graph.invoke({"text": payload.text})
 
-    return OrchestrateResponse(
-        parsed=parsed,
-        route=route,
-        preflight=preflight,
-        draft_answer=state.get("draft_answer"),
-        postcheck=postcheck,
-        telemetry_events=telemetry_events,
-    )
+        parsed = ParseResponse.model_validate(state["parsed"])
+        route = RouteResponse.model_validate(state["route"])
+        preflight = PreflightResponse.model_validate(state["preflight"])
+
+        postcheck = None
+        if state.get("postcheck") is not None:
+            postcheck = PostcheckResponse.model_validate(state["postcheck"])
+
+        telemetry_events = []
+        if preflight.defect_flags:
+            telemetry_events.extend(preflight.defect_flags)
+        if postcheck and postcheck.events:
+            telemetry_events.extend(postcheck.events)
+
+        return OrchestrateResponse(
+            parsed=parsed,
+            route=route,
+            preflight=preflight,
+            draft_answer=state.get("draft_answer"),
+            postcheck=postcheck,
+            telemetry_events=telemetry_events,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="runOrchestrator unavailable in current deployment",
+        ) from exc
