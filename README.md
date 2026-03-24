@@ -32,7 +32,7 @@ That means:
 Required for Render production:
 - RUNTIME_MODE=FULL_CORE
 - LOG_PATH=logs/events.jsonl
-- PUBLIC_BASE_URL=https://YOUR-SERVICE.onrender.com
+- PUBLIC_BASE_URL=https://architect-orchestrator.onrender.com
 - AUTO_ORCHESTRATOR_LITE=ON
 - HEAVY_ORCHESTRATION_TRIGGER=ON
 - RUN_ORCHESTRATOR_ENABLED=false
