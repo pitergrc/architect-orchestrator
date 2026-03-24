@@ -1,60 +1,55 @@
-# Architect Orchestrator v1
+# Architect Orchestrator
 
-Локальный бесплатный оркестратор для AnalyzerCore:
-- FastAPI API
-- LangGraph workflow
-- Ollama backend
-- JSONL telemetry
-- Простейшие preflight/postcheck проверки
+Render-only lite orchestration service for Architect GPT.
 
-## Структура
-- `app/main.py` — FastAPI entrypoint
-- `app/schemas.py` — Pydantic модели
-- `app/parser.py` — prompt parse
-- `app/router.py` — route resolver
-- `app/runtime.py` — preflight/activation
-- `app/postcheck.py` — post-check и flags
-- `app/telemetry.py` — JSONL логирование
-- `app/graph.py` — LangGraph workflow
-- `app/llm.py` — вызов Ollama API
-- `logs/events.jsonl` — события telemetry
+## Production mode
+Primary mode:
+- Auto-Orchestrator Lite = ON
+- Heavy Orchestration = trigger-based
+- runOrchestrator = hidden fallback
 
-## Быстрый старт
-```powershell
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-fastapi dev app\main.py
-```
+## Public production endpoints
+- GET /health
+- GET /healthz
+- POST /parse
+- POST /route
+- POST /preflight
+- POST /postcheck
 
-После старта:
-- docs: `http://127.0.0.1:8000/docs`
-- openapi: `http://127.0.0.1:8000/openapi.json`
-- health: `http://127.0.0.1:8000/health`
+## Hidden fallback endpoint
+- POST /orchestrate
 
-## Ollama
-По умолчанию оркестратор ходит в:
-- `http://127.0.0.1:11434/api/chat`
+`/orchestrate` stays in the codebase as a legacy/dev/fallback path.
+By default:
+- RUN_ORCHESTRATOR_ENABLED=false
+- RUN_ORCHESTRATOR_PUBLIC=false
 
-Модель по умолчанию:
-- `gemma3`
+That means:
+- GPT Actions do not see `/orchestrate`
+- calling `/orchestrate` directly returns a controlled 503 unless explicitly enabled
 
-Поменять можно через `.env`.
+## Environment variables
+Required for Render production:
+- RUNTIME_MODE=FULL_CORE
+- LOG_PATH=logs/events.jsonl
+- PUBLIC_BASE_URL=https://YOUR-SERVICE.onrender.com
+- AUTO_ORCHESTRATOR_LITE=ON
+- HEAVY_ORCHESTRATION_TRIGGER=ON
+- RUN_ORCHESTRATOR_ENABLED=false
+- RUN_ORCHESTRATOR_PUBLIC=false
 
-## Эндпоинты
-- `GET /health`
-- `POST /parse`
-- `POST /route`
-- `POST /preflight`
-- `POST /postcheck`
-- `POST /orchestrate`
+Legacy/dev only:
+- OLLAMA_BASE_URL=http://127.0.0.1:11434
+- OLLAMA_MODEL=gemma3:1b
 
-## Cloudflare Tunnel
-Когда локальный сервер готов, можно открыть наружу:
-```powershell
-cloudflared tunnel --url http://localhost:8000
-```
+## Render deploy
+Build Command:
+`pip install -r requirements.txt`
 
-## Замечания
-Это стартовый рабочий каркас.
-Он не заменяет AnalyzerCore и не дублирует law; он только делает runtime-enforcement.
+Start Command:
+`uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+
+## Notes
+- Production path is Render-only and does not rely on local PC or local Ollama.
+- Do not use free Render Key Value or free Render Postgres as the source of truth for long-term critical state.
+- Use Render Environment Variables or Environment Groups for secrets.
