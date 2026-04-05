@@ -66,6 +66,13 @@ class PreflightResponse(BaseModel):
     ask_ledger: list[AskItem] = Field(default_factory=list)
     audit_hint: Literal["response_audit", "system_audit"] = "response_audit"
 
+    task_profile: dict | None = None
+    execution_flags: dict | None = None
+    constraints_flags: dict | None = None
+    deliverable_contract: str | None = None
+    risk_flags: list[str] = Field(default_factory=list)
+
+
 class ClassifyResponse(BaseModel):
     primary_task_class: Literal["formal", "coding", "research", "planning", "diagnosis", "transformation"]
     secondary_task_class: Literal["formal", "coding", "research", "planning", "diagnosis", "transformation"] | None = None
@@ -73,6 +80,7 @@ class ClassifyResponse(BaseModel):
     stakes: Literal["low", "medium", "high"]
     route_confidence: Literal["low", "medium", "high"]
     re_route_allowed: bool = True
+
 
 class ExecutionPlanResponse(BaseModel):
     execution_mode: Literal["fast", "standard", "deep", "hybrid", "artifact_first"]
@@ -86,17 +94,12 @@ class ExecutionPlanResponse(BaseModel):
     max_repair_cycles: int = 1
     deliverable_contract: Literal["answer", "plan", "spec", "memo", "patch", "report", "artifact"]
 
-class ConstraintsCheckResponse(BaseModel):
-    hard_constraints: list[str] = []
-    deployability_risk: Literal["low", "medium", "high"] = "low"
-    artifact_validation_required: bool = False
-    known_environment_limits: list[str] = []
 
 class ConstraintsCheckResponse(BaseModel):
-    hard_constraints: list[str] = []
+    hard_constraints: list[str] = Field(default_factory=list)
     deployability_risk: Literal["low", "medium", "high"] = "low"
     artifact_validation_required: bool = False
-    known_environment_limits: list[str] = []
+    known_environment_limits: list[str] = Field(default_factory=list)
 
 
 class PostcheckRequest(BaseModel):
@@ -111,7 +114,7 @@ class PostcheckResponse(BaseModel):
     events: list[str] = Field(default_factory=list)
     missing_asks: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
-    issues: list[str] = []
+    issues: list[str] = Field(default_factory=list)
     status_too_strong: bool = False
     repair_needed: bool = False
     recommended_status: Literal["final", "provisional", "partial", "blocked"] | None = None
