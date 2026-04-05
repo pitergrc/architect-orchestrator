@@ -1,0 +1,1165 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Architect Orchestrator",
+    "version": "0.3.0-draft"
+  },
+  "servers": [
+    {
+      "url": "https://architect-orchestrator.onrender.com"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "summary": "Healthz",
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/parse": {
+      "post": {
+        "summary": "Parse Endpoint",
+        "operationId": "parsePrompt",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParseResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/route": {
+      "post": {
+        "summary": "Route Endpoint",
+        "operationId": "resolveRoute",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RouteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/preflight": {
+      "post": {
+        "summary": "Preflight Endpoint",
+        "operationId": "runPreflight",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreflightRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreflightResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/postcheck": {
+      "post": {
+        "summary": "Postcheck Endpoint",
+        "operationId": "runPostcheck",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostcheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostcheckResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/classify": {
+      "post": {
+        "summary": "Classify Task Endpoint",
+        "operationId": "classifyTask",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassifyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassifyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/execution-plan": {
+      "post": {
+        "summary": "Execution Planning Endpoint",
+        "operationId": "planExecution",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionPlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionPlanResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/constraints-check": {
+      "post": {
+        "summary": "Constraints Check Endpoint",
+        "operationId": "checkConstraints",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConstraintsCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConstraintsCheckResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AskItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Priority",
+            "default": "medium"
+          },
+          "droppable": {
+            "type": "boolean",
+            "title": "Droppable",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "AskItem"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "ok"
+          },
+          "service": {
+            "type": "string",
+            "title": "Service",
+            "default": "architect-orchestrator"
+          }
+        },
+        "type": "object",
+        "title": "HealthResponse"
+      },
+      "ParseResponse": {
+        "properties": {
+          "main_ask": {
+            "type": "string",
+            "title": "Main Ask"
+          },
+          "secondary_asks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Secondary Asks"
+          },
+          "constraints": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Constraints"
+          },
+          "examples": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Examples"
+          },
+          "hypotheses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Hypotheses"
+          },
+          "style_preferences": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Style Preferences"
+          },
+          "policy_or_core_change_request": {
+            "type": "boolean",
+            "title": "Policy Or Core Change Request"
+          },
+          "misread_risk": {
+            "type": "string",
+            "title": "Misread Risk"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "deliverable_hint": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "plan",
+              "spec",
+              "memo",
+              "patch",
+              "report",
+              "artifact",
+              "unknown"
+            ],
+            "title": "Deliverable Hint",
+            "default": "unknown"
+          }
+        },
+        "type": "object",
+        "required": [
+          "main_ask",
+          "secondary_asks",
+          "constraints",
+          "examples",
+          "hypotheses",
+          "style_preferences",
+          "policy_or_core_change_request",
+          "misread_risk"
+        ],
+        "title": "ParseResponse"
+      },
+      "PostcheckRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "parsed": {
+            "$ref": "#/components/schemas/ParseResponse"
+          },
+          "route": {
+            "type": "string",
+            "enum": [
+              "ordinary",
+              "compatibility",
+              "migration",
+              "rfc",
+              "release"
+            ],
+            "title": "Route"
+          },
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "parsed",
+          "route",
+          "answer"
+        ],
+        "title": "PostcheckRequest"
+      },
+      "PostcheckResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "events": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "missing_asks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Asks"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "repairable_defect",
+              "critical_defect",
+              "blocked"
+            ],
+            "title": "Result"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Issues"
+          },
+          "lost_asks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Lost Asks"
+          },
+          "status_too_strong": {
+            "type": "boolean",
+            "title": "Status Too Strong",
+            "default": false
+          },
+          "repair_needed": {
+            "type": "boolean",
+            "title": "Repair Needed",
+            "default": false
+          },
+          "recommended_status": {
+            "type": "string",
+            "enum": [
+              "final",
+              "provisional",
+              "partial",
+              "blocked"
+            ],
+            "title": "Recommended Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok"
+        ],
+        "title": "PostcheckResponse"
+      },
+      "PreflightRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "parsed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParseResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "route": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ordinary",
+                  "compatibility",
+                  "migration",
+                  "rfc",
+                  "release"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route"
+          },
+          "classification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClassifyResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "execution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionPlanResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "constraints_packet": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConstraintsCheckResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Constraints Packet"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "PreflightRequest"
+      },
+      "PreflightResponse": {
+        "properties": {
+          "runtime_mode": {
+            "type": "string",
+            "title": "Runtime Mode",
+            "default": "FULL_CORE"
+          },
+          "loaded_core": {
+            "type": "boolean",
+            "title": "Loaded Core",
+            "default": true
+          },
+          "no_duplicate_law": {
+            "type": "boolean",
+            "title": "No Duplicate Law",
+            "default": true
+          },
+          "prompt_parse_active": {
+            "type": "boolean",
+            "title": "Prompt Parse Active",
+            "default": true
+          },
+          "ask_ledger_active": {
+            "type": "boolean",
+            "title": "Ask Ledger Active",
+            "default": true
+          },
+          "prompt_coverage_required": {
+            "type": "boolean",
+            "title": "Prompt Coverage Required",
+            "default": true
+          },
+          "audit_scope_resolver_active": {
+            "type": "boolean",
+            "title": "Audit Scope Resolver Active",
+            "default": true
+          },
+          "defect_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Defect Flags"
+          },
+          "ask_ledger": {
+            "items": {
+              "$ref": "#/components/schemas/AskItem"
+            },
+            "type": "array",
+            "title": "Ask Ledger"
+          },
+          "audit_hint": {
+            "type": "string",
+            "enum": [
+              "response_audit",
+              "system_audit"
+            ],
+            "title": "Audit Hint",
+            "default": "response_audit"
+          },
+          "task_profile": {
+            "type": "object",
+            "title": "Task Profile",
+            "properties": {
+              "primary_task_class": {
+                "type": "string"
+              },
+              "secondary_task_class": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "difficulty": {
+                "type": "string"
+              },
+              "stakes": {
+                "type": "string"
+              },
+              "execution_mode": {
+                "type": "string"
+              }
+            }
+          },
+          "execution_flags": {
+            "type": "object",
+            "title": "Execution Flags",
+            "properties": {
+              "tool_mandatory": {
+                "type": "boolean"
+              },
+              "verifier_required": {
+                "type": "boolean"
+              },
+              "critic_required": {
+                "type": "boolean"
+              },
+              "carryover_required": {
+                "type": "boolean"
+              }
+            }
+          },
+          "constraints_flags": {
+            "type": "object",
+            "title": "Constraints Flags",
+            "properties": {
+              "constraints_check_required": {
+                "type": "boolean"
+              },
+              "deployability_check_required": {
+                "type": "boolean"
+              }
+            }
+          },
+          "deliverable_contract": {
+            "type": "string",
+            "title": "Deliverable Contract"
+          },
+          "risk_flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Risk Flags"
+          }
+        },
+        "type": "object",
+        "title": "PreflightResponse"
+      },
+      "PromptInput": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Raw user message"
+          },
+          "prior_route": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prior Route"
+          },
+          "prior_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prior Mode"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "PromptInput"
+      },
+      "RouteRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "parsed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParseResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "RouteRequest"
+      },
+      "RouteResponse": {
+        "properties": {
+          "route": {
+            "type": "string",
+            "enum": [
+              "ordinary",
+              "compatibility",
+              "migration",
+              "rfc",
+              "release"
+            ],
+            "title": "Route"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "route"
+        ],
+        "title": "RouteResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ClassifyRequest": {
+        "type": "object",
+        "title": "ClassifyRequest",
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "parsed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParseResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "ClassifyResponse": {
+        "type": "object",
+        "title": "ClassifyResponse",
+        "properties": {
+          "primary_task_class": {
+            "type": "string",
+            "enum": [
+              "formal",
+              "coding",
+              "research",
+              "planning",
+              "diagnosis",
+              "transformation"
+            ],
+            "title": "Primary Task Class"
+          },
+          "secondary_task_class": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "formal",
+                  "coding",
+                  "research",
+                  "planning",
+                  "diagnosis",
+                  "transformation"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secondary Task Class"
+          },
+          "difficulty": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "extreme"
+            ],
+            "title": "Difficulty"
+          },
+          "stakes": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Stakes"
+          },
+          "route_confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Route Confidence"
+          },
+          "re_route_allowed": {
+            "type": "boolean",
+            "title": "Re Route Allowed",
+            "default": true
+          }
+        },
+        "required": [
+          "primary_task_class",
+          "difficulty",
+          "stakes",
+          "route_confidence"
+        ]
+      },
+      "ExecutionPlanRequest": {
+        "type": "object",
+        "title": "ExecutionPlanRequest",
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "parsed": {
+            "$ref": "#/components/schemas/ParseResponse"
+          },
+          "classification": {
+            "$ref": "#/components/schemas/ClassifyResponse"
+          }
+        },
+        "required": [
+          "text",
+          "parsed",
+          "classification"
+        ]
+      },
+      "ExecutionPlanResponse": {
+        "type": "object",
+        "title": "ExecutionPlanResponse",
+        "properties": {
+          "execution_mode": {
+            "type": "string",
+            "enum": [
+              "fast",
+              "standard",
+              "deep",
+              "hybrid",
+              "artifact_first"
+            ],
+            "title": "Execution Mode"
+          },
+          "tool_mandatory": {
+            "type": "boolean",
+            "title": "Tool Mandatory",
+            "default": false
+          },
+          "verifier_required": {
+            "type": "boolean",
+            "title": "Verifier Required",
+            "default": true
+          },
+          "critic_required": {
+            "type": "boolean",
+            "title": "Critic Required",
+            "default": false
+          },
+          "carryover_required": {
+            "type": "boolean",
+            "title": "Carryover Required",
+            "default": false
+          },
+          "constraints_check_required": {
+            "type": "boolean",
+            "title": "Constraints Check Required",
+            "default": true
+          },
+          "deployability_check_required": {
+            "type": "boolean",
+            "title": "Deployability Check Required",
+            "default": false
+          },
+          "max_passes": {
+            "type": "integer",
+            "title": "Max Passes",
+            "default": 2
+          },
+          "max_repair_cycles": {
+            "type": "integer",
+            "title": "Max Repair Cycles",
+            "default": 1
+          },
+          "deliverable_contract": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "plan",
+              "spec",
+              "memo",
+              "patch",
+              "report",
+              "artifact"
+            ],
+            "title": "Deliverable Contract"
+          }
+        },
+        "required": [
+          "execution_mode",
+          "deliverable_contract"
+        ]
+      },
+      "ConstraintsCheckRequest": {
+        "type": "object",
+        "title": "ConstraintsCheckRequest",
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "parsed": {
+            "$ref": "#/components/schemas/ParseResponse"
+          },
+          "classification": {
+            "$ref": "#/components/schemas/ClassifyResponse"
+          },
+          "execution": {
+            "$ref": "#/components/schemas/ExecutionPlanResponse"
+          }
+        },
+        "required": [
+          "text",
+          "parsed",
+          "classification",
+          "execution"
+        ]
+      },
+      "ConstraintsCheckResponse": {
+        "type": "object",
+        "title": "ConstraintsCheckResponse",
+        "properties": {
+          "hard_constraints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Hard Constraints"
+          },
+          "deployability_risk": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Deployability Risk",
+            "default": "low"
+          },
+          "artifact_validation_required": {
+            "type": "boolean",
+            "title": "Artifact Validation Required",
+            "default": false
+          },
+          "known_environment_limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Known Environment Limits"
+          }
+        }
+      }
+    }
+  }
+}
