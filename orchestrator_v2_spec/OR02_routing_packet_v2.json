@@ -1,0 +1,43 @@
+{
+  "parse": {
+    "main_ask": "string",
+    "secondary_asks": [
+      "string"
+    ],
+    "constraints": [
+      "string"
+    ],
+    "deliverable_hint": "answer|plan|spec|memo|patch|report|artifact|unknown",
+    "misread_risk": "low|medium|high"
+  },
+  "classification": {
+    "primary_task_class": "formal|coding|research|planning|diagnosis|transformation",
+    "secondary_task_class": "formal|coding|research|planning|diagnosis|transformation|null",
+    "difficulty": "low|medium|high|extreme",
+    "stakes": "low|medium|high",
+    "route_confidence": "low|medium|high",
+    "re_route_allowed": true
+  },
+  "execution": {
+    "execution_mode": "fast|standard|deep|hybrid|artifact_first",
+    "tool_mandatory": false,
+    "verifier_required": true,
+    "critic_required": false,
+    "carryover_required": false,
+    "constraints_check_required": true,
+    "deployability_check_required": false,
+    "max_passes": 2,
+    "max_repair_cycles": 1,
+    "deliverable_contract": "answer|plan|spec|memo|patch|report|artifact"
+  },
+  "constraints": {
+    "hard_constraints": [],
+    "deployability_risk": "low|medium|high",
+    "artifact_validation_required": false,
+    "known_environment_limits": []
+  },
+  "validation": {
+    "validators": [],
+    "critical_failure_conditions": []
+  }
+}
