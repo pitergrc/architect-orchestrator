@@ -20,8 +20,11 @@ from .schemas import (
     OrchestrateRequest,
     OrchestrateResponse,
     TelemetryEvent,
+    ClassifyRequest,
     ClassifyResponse,
+    ExecutionPlanRequest,
     ExecutionPlanResponse,
+    ConstraintsCheckRequest,
     ConstraintsCheckResponse,
 )
 
@@ -413,44 +416,39 @@ def route_endpoint(payload: RouteRequest) -> RouteResponse:
 
 
 @app.post("/classify", response_model=ClassifyResponse, operation_id="classifyTask")
-def classify_task(payload: dict) -> ClassifyResponse:
-    text = payload.get("text", "")
-    parsed = _payload_parsed(payload) or parse_prompt(text)
+def classify_task(payload: ClassifyRequest) -> ClassifyResponse:
+    text = payload.text
+    parsed = payload.parsed or parse_prompt(text)
     return _classify_task_impl(text, parsed)
 
-
 @app.post("/execution-plan", response_model=ExecutionPlanResponse, operation_id="planExecution")
-def plan_execution(payload: dict) -> ExecutionPlanResponse:
-    text = payload.get("text", "")
-    parsed = _payload_parsed(payload) or parse_prompt(text)
-    route = _payload_route(payload, text, parsed)
+def plan_execution(payload: ExecutionPlanRequest) -> ExecutionPlanResponse:
+    text = payload.text
+    parsed = payload.parsed or parse_prompt(text)
+    route = payload.route or resolve_route(text, parsed)
 
-    raw_classification = payload.get("classification")
-    if raw_classification is None:
+    if payload.classification is None:
         classification = _classify_task_impl(text, parsed)
     else:
-        classification = ClassifyResponse.model_validate(raw_classification)
+        classification = payload.classification
 
     return _plan_execution_impl(text, parsed, route, classification)
 
-
 @app.post("/constraints-check", response_model=ConstraintsCheckResponse, operation_id="checkConstraints")
-def check_constraints(payload: dict) -> ConstraintsCheckResponse:
-    text = payload.get("text", "")
-    parsed = _payload_parsed(payload) or parse_prompt(text)
+def check_constraints(payload: ConstraintsCheckRequest) -> ConstraintsCheckResponse:
+    text = payload.text
+    parsed = payload.parsed or parse_prompt(text)
 
-    raw_classification = payload.get("classification")
-    if raw_classification is None:
+    if payload.classification is None:
         classification = _classify_task_impl(text, parsed)
     else:
-        classification = ClassifyResponse.model_validate(raw_classification)
+        classification = payload.classification
 
-    raw_execution = payload.get("execution")
-    if raw_execution is None:
-        route = _payload_route(payload, text, parsed)
+    if payload.execution is None:
+        route = payload.route or resolve_route(text, parsed)
         execution = _plan_execution_impl(text, parsed, route, classification)
     else:
-        execution = ExecutionPlanResponse.model_validate(raw_execution)
+        execution = payload.execution
 
     return _check_constraints_impl(parsed, classification, execution)
 
