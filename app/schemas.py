@@ -30,6 +30,12 @@ class ParseResponse(BaseModel):
     deliverable_hint: str | None = None
     notes: list[str] = Field(default_factory=list)
 
+    # v2 additions — keep defaults for backward compatibility
+    possible_surface_interpretation: str = ""
+    strongest_alternative_interpretation: str = ""
+    needs_hidden_trap_screen: bool = False
+    user_intent_mode: Literal["reference", "case_analysis", "tutor", "decision_support", "mixed"] = "mixed"
+
 
 class RouteRequest(BaseModel):
     text: str
@@ -39,6 +45,12 @@ class RouteRequest(BaseModel):
 class RouteResponse(BaseModel):
     route: RouteType
     reasons: list[str] = Field(default_factory=list)
+
+    # v2 additions — safe defaults
+    orchestration_required: bool = True
+    screening_required: bool = True
+    default_depth_floor: Literal["standard", "deep"] = "standard"
+    can_use_light_internal_path: bool = False
 
 
 class AskItem(BaseModel):
@@ -81,6 +93,14 @@ class ClassifyResponse(BaseModel):
     route_confidence: Literal["low", "medium", "high"]
     re_route_allowed: bool = True
 
+    # v2 additions — safe defaults
+    hidden_trap_risk: Literal["low", "medium", "high"] = "low"
+    popularity_bias_risk: Literal["low", "medium", "high"] = "low"
+    evidence_debt: Literal["low", "medium", "high"] = "low"
+    freshness_need: Literal["low", "medium", "high"] = "low"
+    tool_need_likelihood: Literal["low", "medium", "high"] = "low"
+    deceptive_simple_risk: Literal["low", "medium", "high"] = "low"
+
 
 class ExecutionPlanResponse(BaseModel):
     execution_mode: Literal["fast", "standard", "deep", "hybrid", "artifact_first"]
@@ -94,12 +114,24 @@ class ExecutionPlanResponse(BaseModel):
     max_repair_cycles: int = 1
     deliverable_contract: Literal["answer", "plan", "spec", "memo", "patch", "report", "artifact"]
 
+    # v2 additions — safe defaults
+    hidden_trap_screen_required: bool = False
+    popularity_check_required: bool = False
+    freshness_check_required: bool = False
+    minimum_status_ceiling_without_tools: Literal["final", "provisional", "partial", "blocked"] = "final"
+    recommended_tools: list[str] = Field(default_factory=list)
+    reason_tools_matter: list[str] = Field(default_factory=list)
+
 
 class ConstraintsCheckResponse(BaseModel):
     hard_constraints: list[str] = Field(default_factory=list)
     deployability_risk: Literal["low", "medium", "high"] = "low"
     artifact_validation_required: bool = False
     known_environment_limits: list[str] = Field(default_factory=list)
+
+    # v2 additions — safe defaults
+    orchestration_limits: list[str] = Field(default_factory=list)
+    status_ceiling: Literal["final", "provisional", "partial", "blocked"] = "final"
 
 
 class PostcheckRequest(BaseModel):
