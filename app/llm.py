@@ -1,24 +1,59 @@
 from __future__ import annotations
 
 import os
-import requests
+
+from openai import OpenAI
 
 
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4")
+OPENAI_TIMEOUT = float(os.getenv("OPENAI_TIMEOUT", "120"))
+
+client = OpenAI(timeout=OPENAI_TIMEOUT)
 
 
 def ask_ollama(user_text: str, system_prompt: str | None = None) -> str:
-    messages = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
-    messages.append({"role": "user", "content": user_text})
+    """
+    Backward-compatible function name.
+    We keep the old name so graph.py does not need to change again.
+    Internally this now uses OpenAI Responses API instead of Ollama.
+    """
 
-    resp = requests.post(
-        f"{OLLAMA_BASE_URL}/api/chat",
-        json={"model": OLLAMA_MODEL, "messages": messages, "stream": False},
-        timeout=120,
+    input_parts = []
+
+    if system_prompt:
+        input_parts.append(
+            {
+                "role": "system",
+                "content": [{"type": "input_text", "text": system_prompt}],
+            }
+        )
+
+    input_parts.append(
+        {
+            "role": "user",
+            "content": [{"type": "input_text", "text": user_text}],
+        }
     )
-    resp.raise_for_status()
-    data = resp.json()
-    return data.get("message", {}).get("content", "")
+
+    try:
+        response = client.responses.create(
+            model=OPENAI_MODEL,
+            input=input_parts,
+        )
+    except Exception as exc:
+        return (
+            "LLM backend unavailable. "
+            "OpenAI request failed, so a reliable draft answer could not be generated. "
+            f"Error: {exc}"
+        )
+
+    output_text = getattr(response, "output_text", "") or ""
+    output_text = output_text.strip()
+
+    if not output_text:
+        return (
+            "LLM backend returned an empty response. "
+            "A reliable draft answer could not be generated."
+        )
+
+    return output_text
