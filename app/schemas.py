@@ -133,6 +133,25 @@ class ConstraintsCheckResponse(BaseModel):
     orchestration_limits: list[str] = Field(default_factory=list)
     status_ceiling: Literal["final", "provisional", "partial", "blocked"] = "final"
 
+class ClassifyRequest(BaseModel):
+    text: str
+    parsed: ParseResponse | None = None
+
+
+class ExecutionPlanRequest(BaseModel):
+    text: str
+    parsed: ParseResponse | None = None
+    route: RouteResponse | None = None
+    classification: ClassifyResponse | None = None
+
+
+class ConstraintsCheckRequest(BaseModel):
+    text: str
+    parsed: ParseResponse | None = None
+    route: RouteResponse | None = None
+    classification: ClassifyResponse | None = None
+    execution: ExecutionPlanResponse | None = None
+
 
 class PostcheckRequest(BaseModel):
     text: str
