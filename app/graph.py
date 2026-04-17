@@ -41,6 +41,7 @@ class FlowState(TypedDict):
     draft_answer: NotRequired[str]
     draft_failure: NotRequired[dict]
     postcheck: NotRequired[dict]
+    repair_count: NotRequired[int]
 
 
 def _join_or_none(items: list[str]) -> str:
@@ -163,9 +164,105 @@ def _build_draft_system_prompt(
     return "\n".join(lines)
 
 
+def _build_repair_system_prompt(
+    parsed: ParseResponse,
+    route: RouteResponse,
+    preflight: PreflightResponse,
+    repair_count: int,
+) -> str:
+    execution_flags = preflight.execution_flags or {}
+    constraints_flags = preflight.constraints_flags or {}
+    risk_flags = preflight.risk_flags or []
+
+    lines: list[str] = [
+        "Ты high-reliability аналитический ассистент.",
+        "Ты не пишешь ответ с нуля: ты исправляешь предыдущий draft после verifier/postcheck.",
+        "Сохрани полезные части draft, но исправь load-bearing defects.",
+        "Не теряй главный ask и secondary asks.",
+        "Не исправляй только стиль, если проблема содержательная.",
+        "",
+        f"Route: {route.route}",
+        f"Main ask: {parsed.main_ask}",
+        f"Secondary asks: {_join_or_none(parsed.secondary_asks)}",
+        f"Constraints: {_join_or_none(parsed.constraints)}",
+        f"User intent mode: {parsed.user_intent_mode}",
+        f"Possible surface interpretation: {parsed.possible_surface_interpretation}",
+        f"Strongest alternative interpretation: {parsed.strongest_alternative_interpretation}",
+        f"Risk flags: {_join_or_none(risk_flags)}",
+        f"Current repair attempt: {repair_count + 1}",
+        "",
+        "Требования к исправлению:",
+        "- исправь пропущенные asks, если они потерялись;",
+        "- если скрытая сложность не отражена, отрази её явно;",
+        "- если есть сильная альтернатива, не игнорируй её;",
+        "- если tools required, не притворяйся, что верификация уже была сделана;",
+        "- если честный final невозможен, явно держи более слабый статус;",
+        "- верни только улучшенный ответ пользователю, без служебных комментариев про repair loop.",
+    ]
+
+    if execution_flags.get("tool_mandatory"):
+        lines.extend([
+            "",
+            "Важно: tool use is mandatory for an honest final.",
+            "Если tools не были реально исполнены, не закрывай ответ как final.",
+        ])
+
+    if constraints_flags.get("status_ceiling") in {"provisional", "partial", "blocked"}:
+        lines.extend([
+            "",
+            f"Важно: current honest status ceiling is {constraints_flags.get('status_ceiling')}.",
+            "Нельзя поднимать статус выше этого потолка.",
+        ])
+
+    return "\n".join(lines)
+
+
+def _build_repair_user_text(
+    original_text: str,
+    previous_draft: str,
+    postcheck: PostcheckResponse,
+) -> str:
+    parts = [
+        "ORIGINAL USER REQUEST:",
+        original_text.strip(),
+        "",
+        "PREVIOUS DRAFT:",
+        (previous_draft or "").strip() or "[empty]",
+        "",
+        "POSTCHECK EVENTS:",
+        _join_or_none(postcheck.events),
+        "",
+        "POSTCHECK ISSUES:",
+        _join_or_none(postcheck.issues),
+        "",
+        "POSTCHECK NOTES:",
+        _join_or_none(postcheck.notes),
+        "",
+        "MISSING ASKS:",
+        _join_or_none(postcheck.missing_asks),
+        "",
+        f"RECOMMENDED STATUS: {postcheck.recommended_status or 'unknown'}",
+        "",
+        "Перепиши draft так, чтобы устранить load-bearing defects, но не выдумывай, что tools уже были использованы, если этого не было.",
+    ]
+    return "\n".join(parts)
+
+
+def _route_after_postcheck(state: FlowState) -> str:
+    post = PostcheckResponse.model_validate(state["postcheck"])
+    execution = ExecutionPlanResponse.model_validate(state["execution"])
+    repair_count = state.get("repair_count", 0)
+
+    if post.repair_needed and repair_count < execution.max_repair_cycles:
+        return "repair"
+
+    return "end"
+
+
 def node_parse(state: FlowState) -> FlowState:
     parsed = parse_prompt(state["text"])
     state["parsed"] = parsed.model_dump()
+    state.setdefault("repair_count", 0)
     return state
 
 
@@ -235,6 +332,52 @@ def node_draft(state: FlowState) -> FlowState:
     return state
 
 
+def node_repair(state: FlowState) -> FlowState:
+    parsed = ParseResponse.model_validate(state["parsed"])
+    route = RouteResponse.model_validate(state["route"])
+    preflight = PreflightResponse.model_validate(state["preflight"])
+    postcheck = PostcheckResponse.model_validate(state["postcheck"])
+
+    repair_count = state.get("repair_count", 0)
+
+    repair_system_prompt = _build_repair_system_prompt(
+        parsed=parsed,
+        route=route,
+        preflight=preflight,
+        repair_count=repair_count,
+    )
+
+    repair_user_text = _build_repair_user_text(
+        original_text=state["text"],
+        previous_draft=state.get("draft_answer", ""),
+        postcheck=postcheck,
+    )
+
+    repaired = generate_draft(repair_user_text, system_prompt=repair_system_prompt)
+    state["repair_count"] = repair_count + 1
+
+    if repaired.ok:
+        state["draft_answer"] = repaired.text
+        state["draft_failure"] = {
+            "ok": True,
+            "provider": repaired.provider,
+            "model": repaired.model,
+            "repair_attempt": state["repair_count"],
+        }
+        return state
+
+    state["draft_answer"] = state.get("draft_answer", "")
+    state["draft_failure"] = {
+        "ok": False,
+        "provider": repaired.provider,
+        "model": repaired.model,
+        "error_type": repaired.error_type,
+        "error_message": repaired.error_message,
+        "repair_attempt": state["repair_count"],
+    }
+    return state
+
+
 def node_postcheck(state: FlowState) -> FlowState:
     parsed = ParseResponse.model_validate(state["parsed"])
     classification = ClassifyResponse.model_validate(state["classification"])
@@ -242,6 +385,7 @@ def node_postcheck(state: FlowState) -> FlowState:
     constraints = ConstraintsCheckResponse.model_validate(state["constraints"])
 
     draft_failure = state.get("draft_failure") or {}
+    repair_count = state.get("repair_count", 0)
 
     if not draft_failure.get("ok", True):
         post = PostcheckResponse(
@@ -271,6 +415,17 @@ def node_postcheck(state: FlowState) -> FlowState:
         constraints=constraints,
     )
 
+    if post.repair_needed and repair_count >= execution.max_repair_cycles:
+        post.repair_needed = False
+        post.ok = False
+        if post.recommended_status == "final":
+            post.recommended_status = "provisional"
+        if "repair_budget_exhausted" not in post.issues:
+            post.issues.append("repair_budget_exhausted")
+        post.notes.append(
+            f"repair budget exhausted after {repair_count} attempt(s); returning best available downgraded result"
+        )
+
     state["postcheck"] = post.model_dump()
     return state
 
@@ -282,12 +437,23 @@ def build_graph():
     graph.add_node("preflight", node_preflight)
     graph.add_node("draft", node_draft)
     graph.add_node("postcheck", node_postcheck)
+    graph.add_node("repair", node_repair)
 
     graph.set_entry_point("parse")
     graph.add_edge("parse", "route")
     graph.add_edge("route", "preflight")
     graph.add_edge("preflight", "draft")
     graph.add_edge("draft", "postcheck")
-    graph.add_edge("postcheck", END)
+
+    graph.add_conditional_edges(
+        "postcheck",
+        _route_after_postcheck,
+        {
+            "repair": "repair",
+            "end": END,
+        },
+    )
+
+    graph.add_edge("repair", "postcheck")
 
     return graph.compile()
