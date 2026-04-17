@@ -8,8 +8,23 @@ from .parser import parse_prompt
 from .router import resolve_route
 from .runtime import run_preflight
 from .postcheck import run_postcheck
-from .llm import ask_ollama
-from .schemas import ParseResponse, RouteResponse, PreflightResponse, PostcheckResponse
+from .llm import generate_draft
+from .orchestration_core import (
+    classify_task,
+    plan_execution,
+    check_constraints,
+    enrich_preflight_response,
+    normalize_postcheck,
+)
+from .schemas import (
+    ParseResponse,
+    RouteResponse,
+    PreflightResponse,
+    PostcheckResponse,
+    ClassifyResponse,
+    ExecutionPlanResponse,
+    ConstraintsCheckResponse,
+)
 
 
 SYSTEM_ROUTES = {"compatibility", "migration", "rfc", "release"}
@@ -19,8 +34,12 @@ class FlowState(TypedDict):
     text: str
     parsed: NotRequired[dict]
     route: NotRequired[dict]
+    classification: NotRequired[dict]
+    execution: NotRequired[dict]
+    constraints: NotRequired[dict]
     preflight: NotRequired[dict]
     draft_answer: NotRequired[str]
+    draft_failure: NotRequired[dict]
     postcheck: NotRequired[dict]
 
 
@@ -144,59 +163,6 @@ def _build_draft_system_prompt(
     return "\n".join(lines)
 
 
-def _normalize_postcheck_with_preflight(
-    post: PostcheckResponse,
-    parsed: ParseResponse,
-    preflight: PreflightResponse,
-) -> PostcheckResponse:
-    execution_flags = preflight.execution_flags or {}
-    constraints_flags = preflight.constraints_flags or {}
-    risk_flags = preflight.risk_flags or []
-
-    if post.recommended_status is None:
-        post.recommended_status = "final"
-
-    # 1) Hidden trap requires weaker closure if the answer stayed too direct
-    if execution_flags.get("hidden_trap_screen_required") and post.recommended_status == "final":
-        post.status_too_strong = True
-        post.repair_needed = True
-        post.recommended_status = "provisional"
-        if "hidden_trap_screen_was_required" not in post.issues:
-            post.issues.append("hidden_trap_screen_was_required")
-        if "hidden_trap_missed" not in post.events:
-            post.events.append("hidden_trap_missed")
-
-    # 2) Mandatory tools mean no honest final without verification
-    if execution_flags.get("tool_mandatory") and post.recommended_status == "final":
-        post.status_too_strong = True
-        post.repair_needed = True
-        post.recommended_status = "provisional"
-        if "tool_required_for_honest_final" not in post.issues:
-            post.issues.append("tool_required_for_honest_final")
-        if "tool_needed_but_skipped" not in post.events:
-            post.events.append("tool_needed_but_skipped")
-
-    # 3) Respect explicit status ceiling from constraints
-    status_ceiling = constraints_flags.get("status_ceiling")
-    if status_ceiling in {"provisional", "partial", "blocked"} and post.recommended_status == "final":
-        post.status_too_strong = True
-        post.repair_needed = True
-        post.recommended_status = status_ceiling
-        if "status_ceiling_enforced" not in post.issues:
-            post.issues.append("status_ceiling_enforced")
-
-    # 4) High popularity-bias risk should usually avoid naive finality
-    if "popularity_bias_risk:high" in risk_flags and post.recommended_status == "final":
-        post.recommended_status = "provisional"
-        if "popularity_support_distinction_needed" not in post.issues:
-            post.issues.append("popularity_support_distinction_needed")
-
-    if post.status_too_strong:
-        post.ok = False
-
-    return post
-
-
 def node_parse(state: FlowState) -> FlowState:
     parsed = parse_prompt(state["text"])
     state["parsed"] = parsed.model_dump()
@@ -213,7 +179,24 @@ def node_route(state: FlowState) -> FlowState:
 def node_preflight(state: FlowState) -> FlowState:
     parsed = ParseResponse.model_validate(state["parsed"])
     route = RouteResponse.model_validate(state["route"])
-    preflight = run_preflight(state["text"], parsed, route.route)
+
+    classification = classify_task(state["text"], parsed)
+    execution = plan_execution(state["text"], parsed, route, classification)
+    constraints = check_constraints(parsed, classification, execution)
+
+    base_preflight = run_preflight(state["text"], parsed, route.route)
+    preflight = enrich_preflight_response(
+        base=base_preflight,
+        parsed=parsed,
+        route=route,
+        classification=classification,
+        plan=execution,
+        constraints=constraints,
+    )
+
+    state["classification"] = classification.model_dump()
+    state["execution"] = execution.model_dump()
+    state["constraints"] = constraints.model_dump()
     state["preflight"] = preflight.model_dump()
     return state
 
@@ -230,17 +213,63 @@ def node_draft(state: FlowState) -> FlowState:
         preflight=preflight,
     )
 
-    state["draft_answer"] = ask_ollama(state["text"], system_prompt=prompt)
+    draft = generate_draft(state["text"], system_prompt=prompt)
+
+    if draft.ok:
+        state["draft_answer"] = draft.text
+        state["draft_failure"] = {
+            "ok": True,
+            "provider": draft.provider,
+            "model": draft.model,
+        }
+        return state
+
+    state["draft_answer"] = ""
+    state["draft_failure"] = {
+        "ok": False,
+        "provider": draft.provider,
+        "model": draft.model,
+        "error_type": draft.error_type,
+        "error_message": draft.error_message,
+    }
     return state
 
 
 def node_postcheck(state: FlowState) -> FlowState:
     parsed = ParseResponse.model_validate(state["parsed"])
+    classification = ClassifyResponse.model_validate(state["classification"])
+    execution = ExecutionPlanResponse.model_validate(state["execution"])
+    constraints = ConstraintsCheckResponse.model_validate(state["constraints"])
+
+    draft_failure = state.get("draft_failure") or {}
+
+    if not draft_failure.get("ok", True):
+        post = PostcheckResponse(
+            ok=False,
+            events=["llm_backend_unavailable"],
+            missing_asks=[],
+            notes=[
+                f"draft generation failed: {draft_failure.get('error_type', 'unknown_error')}",
+                draft_failure.get("error_message", "no error details available"),
+            ],
+            issues=["draft_generation_failed"],
+            status_too_strong=False,
+            repair_needed=False,
+            recommended_status="blocked",
+        )
+        state["postcheck"] = post.model_dump()
+        return state
+
     route = RouteResponse.model_validate(state["route"])
-    preflight = PreflightResponse.model_validate(state["preflight"])
 
     post = run_postcheck(state["text"], parsed, route.route, state.get("draft_answer", ""))
-    post = _normalize_postcheck_with_preflight(post, parsed, preflight)
+    post = normalize_postcheck(
+        out=post,
+        parsed=parsed,
+        classification=classification,
+        plan=execution,
+        constraints=constraints,
+    )
 
     state["postcheck"] = post.model_dump()
     return state
