@@ -366,7 +366,6 @@ def node_repair(state: FlowState) -> FlowState:
         }
         return state
 
-    state["draft_answer"] = state.get("draft_answer", "")
     state["draft_failure"] = {
         "ok": False,
         "provider": repaired.provider,
@@ -380,14 +379,41 @@ def node_repair(state: FlowState) -> FlowState:
 
 def node_postcheck(state: FlowState) -> FlowState:
     parsed = ParseResponse.model_validate(state["parsed"])
+    route = RouteResponse.model_validate(state["route"])
     classification = ClassifyResponse.model_validate(state["classification"])
     execution = ExecutionPlanResponse.model_validate(state["execution"])
     constraints = ConstraintsCheckResponse.model_validate(state["constraints"])
 
     draft_failure = state.get("draft_failure") or {}
     repair_count = state.get("repair_count", 0)
+    best_available_draft = (state.get("draft_answer") or "").strip()
 
     if not draft_failure.get("ok", True):
+        if best_available_draft:
+            post = run_postcheck(state["text"], parsed, route.route, best_available_draft)
+            post = normalize_postcheck(
+                out=post,
+                parsed=parsed,
+                classification=classification,
+                plan=execution,
+                constraints=constraints,
+            )
+            post.ok = False
+            post.repair_needed = False
+            if post.recommended_status == "final":
+                post.recommended_status = "provisional"
+            if "repair_generation_failed" not in post.issues:
+                post.issues.append("repair_generation_failed")
+            post.notes.append(
+                f"repair pass failed after {repair_count} attempt(s); returning best available previous draft"
+            )
+            post.notes.append(
+                f"repair failure details: {draft_failure.get('error_type', 'unknown_error')} / "
+                f"{draft_failure.get('error_message', 'no error details available')}"
+            )
+            state["postcheck"] = post.model_dump()
+            return state
+
         post = PostcheckResponse(
             ok=False,
             events=["llm_backend_unavailable"],
@@ -403,8 +429,6 @@ def node_postcheck(state: FlowState) -> FlowState:
         )
         state["postcheck"] = post.model_dump()
         return state
-
-    route = RouteResponse.model_validate(state["route"])
 
     post = run_postcheck(state["text"], parsed, route.route, state.get("draft_answer", ""))
     post = normalize_postcheck(
