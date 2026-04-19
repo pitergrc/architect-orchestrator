@@ -6,28 +6,39 @@ from dataclasses import dataclass
 from openai import OpenAI
 
 
-OPENAI_MODEL = (
-    os.getenv("OPENAI_MODEL")
-    or os.getenv("OPENAI_MODE")   # backward compatibility for old env typo
-    or "gpt-5.4"
-)
-OPENAI_TIMEOUT = float(os.getenv("OPENAI_TIMEOUT", "120"))
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
+GROQ_TIMEOUT = float(os.getenv("GROQ_TIMEOUT", "120"))
+GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 
 
 @dataclass
 class DraftResult:
     ok: bool
     text: str
-    provider: str = "openai"
-    model: str = OPENAI_MODEL
+    provider: str = "groq"
+    model: str = GROQ_MODEL
     error_type: str | None = None
     error_message: str | None = None
 
 
-client = OpenAI(timeout=OPENAI_TIMEOUT)
+def _build_client() -> OpenAI:
+    return OpenAI(
+        api_key=GROQ_API_KEY,
+        base_url=GROQ_BASE_URL,
+        timeout=GROQ_TIMEOUT,
+    )
 
 
 def generate_draft(user_text: str, system_prompt: str | None = None) -> DraftResult:
+    if not GROQ_API_KEY:
+        return DraftResult(
+            ok=False,
+            text="",
+            error_type="missing_groq_api_key",
+            error_message="GROQ_API_KEY is not set",
+        )
+
     input_parts = []
 
     if system_prompt:
@@ -45,16 +56,18 @@ def generate_draft(user_text: str, system_prompt: str | None = None) -> DraftRes
         }
     )
 
+    client = _build_client()
+
     try:
         response = client.responses.create(
-            model=OPENAI_MODEL,
+            model=GROQ_MODEL,
             input=input_parts,
         )
     except Exception as exc:
         return DraftResult(
             ok=False,
             text="",
-            error_type="openai_request_failed",
+            error_type="groq_request_failed",
             error_message=str(exc),
         )
 
@@ -65,19 +78,20 @@ def generate_draft(user_text: str, system_prompt: str | None = None) -> DraftRes
             ok=False,
             text="",
             error_type="empty_model_output",
-            error_message="OpenAI Responses API returned empty output_text",
+            error_message="Groq Responses API returned empty output_text",
         )
 
     return DraftResult(
         ok=True,
         text=output_text,
+        provider="groq",
+        model=GROQ_MODEL,
     )
 
 
 def ask_ollama(user_text: str, system_prompt: str | None = None) -> str:
     """
-    Backward-compatible legacy wrapper.
-    Keep this only so old callers do not break immediately.
+    Legacy wrapper kept for backward compatibility.
     New code should use generate_draft().
     """
     result = generate_draft(user_text=user_text, system_prompt=system_prompt)
