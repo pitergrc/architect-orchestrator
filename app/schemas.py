@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Any, Literal
 from pydantic import BaseModel, Field
 
@@ -29,8 +27,6 @@ class ParseResponse(BaseModel):
     misread_risk: str
     deliverable_hint: str | None = None
     notes: list[str] = Field(default_factory=list)
-
-    # v2 additions — keep defaults for backward compatibility
     possible_surface_interpretation: str = ""
     strongest_alternative_interpretation: str = ""
     needs_hidden_trap_screen: bool = False
@@ -45,8 +41,6 @@ class RouteRequest(BaseModel):
 class RouteResponse(BaseModel):
     route: RouteType
     reasons: list[str] = Field(default_factory=list)
-
-    # v2 additions — safe defaults
     orchestration_required: bool = True
     screening_required: bool = True
     default_depth_floor: Literal["standard", "deep"] = "standard"
@@ -77,7 +71,6 @@ class PreflightResponse(BaseModel):
     defect_flags: list[str] = Field(default_factory=list)
     ask_ledger: list[AskItem] = Field(default_factory=list)
     audit_hint: Literal["response_audit", "system_audit"] = "response_audit"
-
     task_profile: dict | None = None
     execution_flags: dict | None = None
     constraints_flags: dict | None = None
@@ -92,8 +85,6 @@ class ClassifyResponse(BaseModel):
     stakes: Literal["low", "medium", "high"]
     route_confidence: Literal["low", "medium", "high"]
     re_route_allowed: bool = True
-
-    # v2 additions — safe defaults
     hidden_trap_risk: Literal["low", "medium", "high"] = "low"
     popularity_bias_risk: Literal["low", "medium", "high"] = "low"
     evidence_debt: Literal["low", "medium", "high"] = "low"
@@ -113,8 +104,6 @@ class ExecutionPlanResponse(BaseModel):
     max_passes: int = 2
     max_repair_cycles: int = 1
     deliverable_contract: Literal["answer", "plan", "spec", "memo", "patch", "report", "artifact"]
-
-    # v2 additions — safe defaults
     hidden_trap_screen_required: bool = False
     popularity_check_required: bool = False
     freshness_check_required: bool = False
@@ -128,10 +117,9 @@ class ConstraintsCheckResponse(BaseModel):
     deployability_risk: Literal["low", "medium", "high"] = "low"
     artifact_validation_required: bool = False
     known_environment_limits: list[str] = Field(default_factory=list)
-
-    # v2 additions — safe defaults
     orchestration_limits: list[str] = Field(default_factory=list)
     status_ceiling: Literal["final", "provisional", "partial", "blocked"] = "final"
+
 
 class ClassifyRequest(BaseModel):
     text: str
