@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from datetime import datetime, UTC
 
 from .schemas import TelemetryEvent
 
 
-DEFAULT_LOG = Path("logs/events.jsonl")
+DEFAULT_LOG = Path(os.getenv("LOG_PATH", "logs/events.jsonl"))
 
 
 def log_event(event: TelemetryEvent, log_path: str | Path = DEFAULT_LOG) -> None:
