@@ -82,7 +82,6 @@ def run_postcheck(text: str, parsed: ParseResponse, route: RouteType, answer: st
     notes: list[str] = []
     issues: list[str] = []
 
-    # 1) Ask coverage
     if parsed.main_ask and parsed.main_ask.lower()[:20] not in lower_answer:
         notes.append("main ask not echoed directly; manual review recommended")
 
@@ -95,7 +94,6 @@ def run_postcheck(text: str, parsed: ParseResponse, route: RouteType, answer: st
         events.append("lost_ask")
         issues.append("secondary asks not visibly covered")
 
-    # 2) Hidden-trap awareness
     if parsed.needs_hidden_trap_screen:
         if not _has_reasoning_signal(lower_answer):
             events.append("hidden_trap_missed")
@@ -104,7 +102,6 @@ def run_postcheck(text: str, parsed: ParseResponse, route: RouteType, answer: st
         if not _mentions_alternative_or_distinction(lower_answer):
             notes.append("hidden-trap task without explicit alternative/distinction wording")
 
-    # 3) Over-strong answers
     status_too_strong = False
     repair_needed = False
     recommended_status: str | None = "final"
@@ -115,7 +112,6 @@ def run_postcheck(text: str, parsed: ParseResponse, route: RouteType, answer: st
         recommended_status = "provisional"
         issues.append("answer may be too final for a hidden-complexity task")
 
-    # 4) System route checks
     if route in SYSTEM_ROUTES:
         if not _has_system_audit_signal(lower_answer):
             events.append("system_audit_framing_missing")
@@ -123,12 +119,10 @@ def run_postcheck(text: str, parsed: ParseResponse, route: RouteType, answer: st
             if recommended_status == "final":
                 recommended_status = "provisional"
 
-    # 5) User-intent-sensitive checks
     if parsed.user_intent_mode in {"case_analysis", "decision_support"}:
         if not _has_reasoning_signal(lower_answer):
             notes.append("case-analysis or decision-support response may be too shallow")
 
-    # 6) If there are real issues, ok should be false
     ok = len(events) == 0 and not status_too_strong
 
     return PostcheckResponse(
