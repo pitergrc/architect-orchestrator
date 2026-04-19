@@ -380,14 +380,18 @@ def normalize_postcheck(
     if normalized.recommended_status is None:
         normalized.recommended_status = "final"
 
-    if parsed.needs_hidden_trap_screen and normalized.recommended_status == "final":
+    hidden_trap_issue_live = (
+        "hidden_trap_missed" in normalized.events
+        or "hidden_trap_screen_was_required" in normalized.issues
+        or any("hidden-complexity" in issue for issue in normalized.issues)
+    )
+
+    if parsed.needs_hidden_trap_screen and hidden_trap_issue_live and normalized.recommended_status == "final":
         normalized.status_too_strong = True
         normalized.repair_needed = True
         normalized.recommended_status = "provisional"
         if "hidden_trap_screen_was_required" not in normalized.issues:
             normalized.issues.append("hidden_trap_screen_was_required")
-        if "hidden_trap_missed" not in normalized.events:
-            normalized.events.append("hidden_trap_missed")
 
     if plan.tool_mandatory and normalized.recommended_status == "final":
         normalized.status_too_strong = True
@@ -408,9 +412,7 @@ def normalize_postcheck(
                 normalized.issues.append("status_ceiling_enforced")
 
     if classification.popularity_bias_risk == "high" and normalized.recommended_status == "final":
-        normalized.recommended_status = "provisional"
-        if "popularity_support_distinction_needed" not in normalized.issues:
-            normalized.issues.append("popularity_support_distinction_needed")
+        normalized.notes.append("popularity-bias risk remains live; manual review recommended")
 
     if normalized.status_too_strong:
         normalized.ok = False
