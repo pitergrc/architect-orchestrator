@@ -74,16 +74,6 @@ POPULARITY_MARKERS = [
     "консенсус",
 ]
 
-CURRENT_FACT_MARKERS = [
-    "сейчас",
-    "на данный момент",
-    "последние",
-    "актуальн",
-    "сегодня",
-    "новые",
-    "обновления",
-]
-
 
 def _split_candidate_parts(text: str) -> list[str]:
     parts = re.split(r"\?|\n|;|\.\s+", text)
@@ -138,26 +128,17 @@ def _detect_surface_and_alternative(text: str, lower: str) -> tuple[str, str]:
     return surface, alt
 
 
-def _detect_hidden_trap_screen(lower: str, multi: bool, parts: list[str]) -> bool:
+def _detect_hidden_trap_screen(lower: str) -> bool:
     if _contains_any(lower, HIDDEN_TRAP_MARKERS):
         return True
 
     if _contains_any(lower, POPULARITY_MARKERS):
         return True
 
-    if _contains_any(lower, CURRENT_FACT_MARKERS):
-        return True
-
-    if multi:
-        return True
-
-    if len(parts) > 1:
+    if "правда ли" in lower:
         return True
 
     if "кажется" in lower or "похоже" in lower:
-        return True
-
-    if "правда ли" in lower:
         return True
 
     return False
@@ -185,6 +166,18 @@ def _detect_misread_risk(
     return "low"
 
 
+def _extract_constraints(lower: str) -> list[str]:
+    constraints: list[str] = []
+
+    if "бесплатно" in lower:
+        constraints.append("must be free")
+
+    if re.search(r"\bбез\s+\S+", lower):
+        constraints.append("negative constraint detected")
+
+    return constraints
+
+
 def parse_prompt(text: str) -> ParseResponse:
     text = text.strip()
     lower = text.lower()
@@ -193,7 +186,7 @@ def parse_prompt(text: str) -> ParseResponse:
     secondary: list[str] = []
     examples: list[str] = []
     hypotheses: list[str] = []
-    constraints: list[str] = []
+    constraints: list[str] = _extract_constraints(lower)
     style: list[str] = []
     notes: list[str] = []
 
@@ -210,12 +203,6 @@ def parse_prompt(text: str) -> ParseResponse:
     if _contains_any(lower, STYLE_MARKERS):
         style.append("style preference detected")
 
-    if "бесплатно" in lower:
-        constraints.append("must be free")
-
-    if "без" in lower:
-        constraints.append("negative constraint detected")
-
     multi = any(m in lower for m in SPLIT_MARKERS) or len(parts) > 1
     if multi:
         notes.append("multi-part request detected")
@@ -227,7 +214,7 @@ def parse_prompt(text: str) -> ParseResponse:
 
     user_intent_mode = _detect_user_intent_mode(lower)
     possible_surface_interpretation, strongest_alternative_interpretation = _detect_surface_and_alternative(text, lower)
-    needs_hidden_trap_screen = _detect_hidden_trap_screen(lower, multi, parts)
+    needs_hidden_trap_screen = _detect_hidden_trap_screen(lower)
 
     misread_risk = _detect_misread_risk(
         lower=lower,
