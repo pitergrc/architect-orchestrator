@@ -26,6 +26,7 @@ from .schemas import (
     ExecutionPlanResponse,
     ConstraintsCheckRequest,
     ConstraintsCheckResponse,
+    ChatBrief,
 )
 
 from .parser import parse_prompt
@@ -190,7 +191,12 @@ def orchestrate_endpoint(payload: OrchestrateRequest) -> OrchestrateResponse:
         from .graph import build_graph
 
         graph = build_graph()
-        state = graph.invoke({"text": payload.text})
+
+        initial_state = {"text": payload.text}
+        if payload.chat_brief is not None:
+            initial_state["chat_brief"] = payload.chat_brief.model_dump()
+
+        state = graph.invoke(initial_state)
 
         parsed = ParseResponse.model_validate(state["parsed"])
         route = RouteResponse.model_validate(state["route"])
@@ -200,11 +206,17 @@ def orchestrate_endpoint(payload: OrchestrateRequest) -> OrchestrateResponse:
         if state.get("postcheck") is not None:
             postcheck = PostcheckResponse.model_validate(state["postcheck"])
 
+        applied_chat_brief = None
+        if state.get("chat_brief") is not None:
+            applied_chat_brief = ChatBrief.model_validate(state["chat_brief"])
+
         telemetry_events = []
         if preflight.defect_flags:
             telemetry_events.extend(preflight.defect_flags)
         if postcheck and postcheck.events:
             telemetry_events.extend(postcheck.events)
+        if applied_chat_brief is not None:
+            telemetry_events.append("chat_brief_used")
 
         return OrchestrateResponse(
             parsed=parsed,
@@ -213,6 +225,7 @@ def orchestrate_endpoint(payload: OrchestrateRequest) -> OrchestrateResponse:
             draft_answer=state.get("draft_answer"),
             postcheck=postcheck,
             telemetry_events=telemetry_events,
+            applied_chat_brief=applied_chat_brief,
         )
     except Exception as exc:
         raise HTTPException(
