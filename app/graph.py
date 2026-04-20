@@ -24,6 +24,7 @@ from .schemas import (
     ClassifyResponse,
     ExecutionPlanResponse,
     ConstraintsCheckResponse,
+    ChatBrief,
 )
 
 
@@ -42,6 +43,7 @@ class FlowState(TypedDict):
     draft_failure: NotRequired[dict]
     postcheck: NotRequired[dict]
     repair_count: NotRequired[int]
+    chat_brief: NotRequired[dict]
 
 
 def _join_or_none(items: list[str]) -> str:
@@ -50,11 +52,90 @@ def _join_or_none(items: list[str]) -> str:
     return "; ".join(items)
 
 
+def _dedup_keep_order(items: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+
+    for item in items:
+        cleaned = item.strip()
+        if not cleaned:
+            continue
+        key = cleaned.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(cleaned)
+
+    return out
+
+
+def _merge_chat_brief_into_parsed(parsed: ParseResponse, brief: ChatBrief) -> ParseResponse:
+    merged = parsed.model_copy(deep=True)
+
+    if brief.main_ask and brief.main_ask.strip():
+        merged.main_ask = brief.main_ask.strip()
+        merged.possible_surface_interpretation = brief.main_ask.strip()
+
+    merged.secondary_asks = _dedup_keep_order([
+        *brief.secondary_asks,
+        *merged.secondary_asks,
+    ])
+
+    merged.constraints = _dedup_keep_order([
+        *brief.constraints,
+        *merged.constraints,
+    ])
+
+    merged.hypotheses = _dedup_keep_order([
+        *brief.candidate_hypotheses,
+        *merged.hypotheses,
+    ])
+
+    if brief.strongest_alternative_interpretation and brief.strongest_alternative_interpretation.strip():
+        merged.strongest_alternative_interpretation = brief.strongest_alternative_interpretation.strip()
+
+    notes = list(merged.notes)
+    notes.append("chat_brief_applied")
+
+    if brief.candidate_hypotheses:
+        notes.append("chat_brief_candidate_hypotheses_supplied")
+
+    if brief.overturn_conditions:
+        notes.append("chat_brief_overturn_conditions_supplied")
+
+    if brief.desired_output_shape:
+        notes.append("chat_brief_output_shape_supplied")
+
+    merged.notes = _dedup_keep_order(notes)
+    return merged
+
+
+def _append_chat_brief_lines(lines: list[str], brief: ChatBrief | None) -> None:
+    if brief is None:
+        return
+
+    lines.extend([
+        "",
+        "Upstream chat-side brief from stronger model:",
+        f"- Chat-brief main ask: {brief.main_ask or 'none'}",
+        f"- Chat-brief secondary asks: {_join_or_none(brief.secondary_asks)}",
+        f"- Chat-brief constraints: {_join_or_none(brief.constraints)}",
+        f"- Chat-brief strongest alternative: {brief.strongest_alternative_interpretation or 'none'}",
+        f"- Chat-brief candidate hypotheses: {_join_or_none(brief.candidate_hypotheses)}",
+        f"- Chat-brief overturn conditions: {_join_or_none(brief.overturn_conditions)}",
+        f"- Chat-brief desired output shape: {_join_or_none(brief.desired_output_shape)}",
+        "",
+        "Используй этот brief как high-value prior analysis от более сильной chat-side модели.",
+        "Но не воспринимай его как абсолютную истину: сверяй его с задачей и не следуй ему слепо.",
+    ])
+
+
 def _build_draft_system_prompt(
     text: str,
     parsed: ParseResponse,
     route: RouteResponse,
     preflight: PreflightResponse,
+    brief: ChatBrief | None = None,
 ) -> str:
     execution_flags = preflight.execution_flags or {}
     constraints_flags = preflight.constraints_flags or {}
@@ -75,6 +156,11 @@ def _build_draft_system_prompt(
         f"Possible surface interpretation: {parsed.possible_surface_interpretation}",
         f"Strongest alternative interpretation: {parsed.strongest_alternative_interpretation}",
         f"Risk flags: {_join_or_none(risk_flags)}",
+    ]
+
+    _append_chat_brief_lines(lines, brief)
+
+    lines.extend([
         "",
         "Обязательные правила ответа:",
         "- не теряй asks пользователя;",
@@ -82,7 +168,7 @@ def _build_draft_system_prompt(
         "- если есть скрытая сложность, отрази её явно;",
         "- если есть сильная альтернатива, не игнорируй её;",
         "- если уверенность ограничена, покажи это честно;",
-    ]
+    ])
 
     if route.route in SYSTEM_ROUTES:
         lines.extend([
@@ -148,6 +234,13 @@ def _build_draft_system_prompt(
             "Так как пользователь просит помощь как новичок, объясняй ясно и по шагам.",
         ])
 
+    if brief is not None and brief.desired_output_shape:
+        lines.extend([
+            "",
+            "Предпочтительная форма ответа от chat-side модели:",
+            *[f"- {item}" for item in brief.desired_output_shape],
+        ])
+
     if constraints_flags.get("status_ceiling") in {"provisional", "partial", "blocked"}:
         lines.extend([
             "",
@@ -169,6 +262,7 @@ def _build_repair_system_prompt(
     route: RouteResponse,
     preflight: PreflightResponse,
     repair_count: int,
+    brief: ChatBrief | None = None,
 ) -> str:
     execution_flags = preflight.execution_flags or {}
     constraints_flags = preflight.constraints_flags or {}
@@ -190,6 +284,11 @@ def _build_repair_system_prompt(
         f"Strongest alternative interpretation: {parsed.strongest_alternative_interpretation}",
         f"Risk flags: {_join_or_none(risk_flags)}",
         f"Current repair attempt: {repair_count + 1}",
+    ]
+
+    _append_chat_brief_lines(lines, brief)
+
+    lines.extend([
         "",
         "Требования к исправлению:",
         "- исправь пропущенные asks, если они потерялись;",
@@ -198,7 +297,7 @@ def _build_repair_system_prompt(
         "- если tools required, не притворяйся, что верификация уже была сделана;",
         "- если честный final невозможен, явно держи более слабый статус;",
         "- верни только улучшенный ответ пользователю, без служебных комментариев про repair loop.",
-    ]
+    ])
 
     if execution_flags.get("tool_mandatory"):
         lines.extend([
@@ -261,6 +360,13 @@ def _route_after_postcheck(state: FlowState) -> str:
 
 def node_parse(state: FlowState) -> FlowState:
     parsed = parse_prompt(state["text"])
+
+    raw_brief = state.get("chat_brief")
+    if raw_brief is not None:
+        brief = ChatBrief.model_validate(raw_brief)
+        parsed = _merge_chat_brief_into_parsed(parsed, brief)
+        state["chat_brief"] = brief.model_dump()
+
     state["parsed"] = parsed.model_dump()
     state.setdefault("repair_count", 0)
     return state
@@ -303,11 +409,16 @@ def node_draft(state: FlowState) -> FlowState:
     route = RouteResponse.model_validate(state["route"])
     preflight = PreflightResponse.model_validate(state["preflight"])
 
+    brief = None
+    if state.get("chat_brief") is not None:
+        brief = ChatBrief.model_validate(state["chat_brief"])
+
     prompt = _build_draft_system_prompt(
         text=state["text"],
         parsed=parsed,
         route=route,
         preflight=preflight,
+        brief=brief,
     )
 
     draft = generate_draft(state["text"], system_prompt=prompt)
@@ -338,6 +449,10 @@ def node_repair(state: FlowState) -> FlowState:
     preflight = PreflightResponse.model_validate(state["preflight"])
     postcheck = PostcheckResponse.model_validate(state["postcheck"])
 
+    brief = None
+    if state.get("chat_brief") is not None:
+        brief = ChatBrief.model_validate(state["chat_brief"])
+
     repair_count = state.get("repair_count", 0)
 
     repair_system_prompt = _build_repair_system_prompt(
@@ -345,6 +460,7 @@ def node_repair(state: FlowState) -> FlowState:
         route=route,
         preflight=preflight,
         repair_count=repair_count,
+        brief=brief,
     )
 
     repair_user_text = _build_repair_user_text(
