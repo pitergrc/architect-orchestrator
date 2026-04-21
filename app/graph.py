@@ -130,6 +130,16 @@ def _append_chat_brief_lines(lines: list[str], brief: ChatBrief | None) -> None:
     ])
 
 
+def _append_no_tools_rule(lines: list[str]) -> None:
+    lines.extend([
+        "",
+        "External tools are NOT available in this call.",
+        "Do not call browser search, code execution, functions, or any tools.",
+        "Return plain text only.",
+        "If the task would require tools for an honest final, say so in text and keep the answer provisional instead of attempting tool use.",
+    ])
+
+
 def _build_draft_system_prompt(
     text: str,
     parsed: ParseResponse,
@@ -156,11 +166,6 @@ def _build_draft_system_prompt(
         f"Possible surface interpretation: {parsed.possible_surface_interpretation}",
         f"Strongest alternative interpretation: {parsed.strongest_alternative_interpretation}",
         f"Risk flags: {_join_or_none(risk_flags)}",
-    ]
-
-    _append_chat_brief_lines(lines, brief)
-
-    lines.extend([
         "",
         "Обязательные правила ответа:",
         "- не теряй asks пользователя;",
@@ -168,7 +173,10 @@ def _build_draft_system_prompt(
         "- если есть скрытая сложность, отрази её явно;",
         "- если есть сильная альтернатива, не игнорируй её;",
         "- если уверенность ограничена, покажи это честно;",
-    ])
+    ]
+
+    _append_no_tools_rule(lines)
+    _append_chat_brief_lines(lines, brief)
 
     if route.route in SYSTEM_ROUTES:
         lines.extend([
@@ -284,11 +292,6 @@ def _build_repair_system_prompt(
         f"Strongest alternative interpretation: {parsed.strongest_alternative_interpretation}",
         f"Risk flags: {_join_or_none(risk_flags)}",
         f"Current repair attempt: {repair_count + 1}",
-    ]
-
-    _append_chat_brief_lines(lines, brief)
-
-    lines.extend([
         "",
         "Требования к исправлению:",
         "- исправь пропущенные asks, если они потерялись;",
@@ -297,7 +300,10 @@ def _build_repair_system_prompt(
         "- если tools required, не притворяйся, что верификация уже была сделана;",
         "- если честный final невозможен, явно держи более слабый статус;",
         "- верни только улучшенный ответ пользователю, без служебных комментариев про repair loop.",
-    ])
+    ]
+
+    _append_no_tools_rule(lines)
+    _append_chat_brief_lines(lines, brief)
 
     if execution_flags.get("tool_mandatory"):
         lines.extend([
