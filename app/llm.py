@@ -10,6 +10,7 @@ GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 GROQ_TIMEOUT = float(os.getenv("GROQ_TIMEOUT", "120"))
 GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
+GROQ_TEMPERATURE = float(os.getenv("GROQ_TEMPERATURE", "0.2"))
 
 
 @dataclass
@@ -62,6 +63,8 @@ def generate_draft(user_text: str, system_prompt: str | None = None) -> DraftRes
         response = client.responses.create(
             model=GROQ_MODEL,
             input=input_parts,
+            temperature=GROQ_TEMPERATURE,
+            tool_choice="none",
         )
     except Exception as exc:
         return DraftResult(
