@@ -19,6 +19,7 @@ from .schemas import (
     PostcheckResponse,
     OrchestrateRequest,
     OrchestrateResponse,
+    ExecutionReality,
     TelemetryEvent,
     ClassifyRequest,
     ClassifyResponse,
@@ -49,11 +50,11 @@ RUN_ORCHESTRATOR_PUBLIC = os.getenv("RUN_ORCHESTRATOR_PUBLIC", "false").lower() 
 if PUBLIC_BASE_URL:
     app = FastAPI(
         title="Architect Orchestrator",
-        version="0.2.0",
+        version="0.3.0",
         servers=[{"url": PUBLIC_BASE_URL}],
     )
 else:
-    app = FastAPI(title="Architect Orchestrator", version="0.2.0")
+    app = FastAPI(title="Architect Orchestrator", version="0.3.0")
 
 
 @app.get("/health", response_model=HealthResponse, operation_id="healthCheck")
@@ -184,7 +185,7 @@ def orchestrate_endpoint(payload: OrchestrateRequest) -> OrchestrateResponse:
     if not RUN_ORCHESTRATOR_ENABLED:
         raise HTTPException(
             status_code=503,
-            detail="runOrchestrator disabled in Render-only lite mode",
+            detail="runOrchestrator disabled in current deployment",
         )
 
     try:
@@ -202,19 +203,13 @@ def orchestrate_endpoint(payload: OrchestrateRequest) -> OrchestrateResponse:
         route = RouteResponse.model_validate(state["route"])
         preflight = PreflightResponse.model_validate(state["preflight"])
 
-        postcheck = None
-        if state.get("postcheck") is not None:
-            postcheck = PostcheckResponse.model_validate(state["postcheck"])
-
         applied_chat_brief = None
         if state.get("chat_brief") is not None:
             applied_chat_brief = ChatBrief.model_validate(state["chat_brief"])
 
-        telemetry_events = []
+        telemetry_events: list[str] = []
         if preflight.defect_flags:
             telemetry_events.extend(preflight.defect_flags)
-        if postcheck and postcheck.events:
-            telemetry_events.extend(postcheck.events)
         if applied_chat_brief is not None:
             telemetry_events.append("chat_brief_used")
 
@@ -222,10 +217,14 @@ def orchestrate_endpoint(payload: OrchestrateRequest) -> OrchestrateResponse:
             parsed=parsed,
             route=route,
             preflight=preflight,
-            draft_answer=state.get("draft_answer"),
-            postcheck=postcheck,
             telemetry_events=telemetry_events,
             applied_chat_brief=applied_chat_brief,
+            execution_reality=ExecutionReality(
+                action_selected=True,
+                response_received=True,
+                draft_safe=True,
+                notes=[],
+            ),
         )
     except Exception as exc:
         raise HTTPException(
