@@ -34,7 +34,8 @@ SYSTEM_ROUTES = {"compatibility", "migration", "rfc", "release"}
 class FlowState(TypedDict):
     text: str
     parsed: NotRequired[dict]
-@@ -39,19 +28,9 @@
+    route: NotRequired[dict]
+    classification: NotRequired[dict]
     execution: NotRequired[dict]
     constraints: NotRequired[dict]
     preflight: NotRequired[dict]
@@ -54,7 +55,8 @@ def _join_or_none(items: list[str]) -> str:
 def _dedup_keep_order(items: list[str]) -> list[str]:
     out: list[str] = []
     seen: set[str] = set()
-@@ -60,9 +39,11 @@
+
+    for item in items:
         cleaned = item.strip()
         if not cleaned:
             continue
@@ -66,7 +68,47 @@ def _dedup_keep_order(items: list[str]) -> list[str]:
         seen.add(key)
         out.append(cleaned)
 
-@@ -110,260 +91,6 @@
+    return out
+
+
+def _merge_chat_brief_into_parsed(parsed: ParseResponse, brief: ChatBrief) -> ParseResponse:
+    merged = parsed.model_copy(deep=True)
+
+    if brief.main_ask and brief.main_ask.strip():
+        merged.main_ask = brief.main_ask.strip()
+        merged.possible_surface_interpretation = brief.main_ask.strip()
+
+    merged.secondary_asks = _dedup_keep_order([
+        *brief.secondary_asks,
+        *merged.secondary_asks,
+    ])
+
+    merged.constraints = _dedup_keep_order([
+        *brief.constraints,
+        *merged.constraints,
+    ])
+
+    merged.hypotheses = _dedup_keep_order([
+        *brief.candidate_hypotheses,
+        *merged.hypotheses,
+    ])
+
+    if brief.strongest_alternative_interpretation and brief.strongest_alternative_interpretation.strip():
+        merged.strongest_alternative_interpretation = brief.strongest_alternative_interpretation.strip()
+
+    notes = list(merged.notes)
+    notes.append("chat_brief_applied")
+
+    if brief.candidate_hypotheses:
+        notes.append("chat_brief_candidate_hypotheses_supplied")
+
+    if brief.overturn_conditions:
+        notes.append("chat_brief_overturn_conditions_supplied")
+
+    if brief.desired_output_shape:
+        notes.append("chat_brief_output_shape_supplied")
+
+    merged.notes = _dedup_keep_order(notes)
     return merged
 
 
@@ -327,7 +369,10 @@ def _route_after_postcheck(state: FlowState) -> str:
 def node_parse(state: FlowState) -> FlowState:
     parsed = parse_prompt(state["text"])
 
-@@ -374,7 +101,6 @@
+    raw_brief = state.get("chat_brief")
+    if raw_brief is not None:
+        brief = ChatBrief.model_validate(raw_brief)
+        parsed = _merge_chat_brief_into_parsed(parsed, brief)
         state["chat_brief"] = brief.model_dump()
 
     state["parsed"] = parsed.model_dump()
@@ -335,7 +380,35 @@ def node_parse(state: FlowState) -> FlowState:
     return state
 
 
-@@ -410,196 +136,16 @@
+def node_route(state: FlowState) -> FlowState:
+    parsed = ParseResponse.model_validate(state["parsed"])
+    route = resolve_route(state["text"], parsed)
+    state["route"] = route.model_dump()
+    return state
+
+
+def node_preflight(state: FlowState) -> FlowState:
+    parsed = ParseResponse.model_validate(state["parsed"])
+    route = RouteResponse.model_validate(state["route"])
+
+    classification = classify_task(state["text"], parsed)
+    execution = plan_execution(state["text"], parsed, route, classification)
+    constraints = check_constraints(parsed, classification, execution)
+
+    base_preflight = run_preflight(state["text"], parsed, route.route)
+    preflight = enrich_preflight_response(
+        base=base_preflight,
+        parsed=parsed,
+        route=route,
+        classification=classification,
+        plan=execution,
+        constraints=constraints,
+    )
+
+    state["classification"] = classification.model_dump()
+    state["execution"] = execution.model_dump()
+    state["constraints"] = constraints.model_dump()
+    state["preflight"] = preflight.model_dump()
     return state
 
 
@@ -534,3 +607,5 @@ def build_graph():
     graph.add_edge("preflight", END)
 
     return graph.compile()
+
+
