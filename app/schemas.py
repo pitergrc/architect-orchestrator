@@ -30,7 +30,13 @@ class ParseResponse(BaseModel):
     possible_surface_interpretation: str = ""
     strongest_alternative_interpretation: str = ""
     needs_hidden_trap_screen: bool = False
-    user_intent_mode: Literal["reference", "case_analysis", "tutor", "decision_support", "mixed"] = "mixed"
+    user_intent_mode: Literal[
+        "reference",
+        "case_analysis",
+        "tutor",
+        "decision_support",
+        "mixed",
+    ] = "mixed"
 
 
 class RouteRequest(BaseModel):
@@ -79,8 +85,22 @@ class PreflightResponse(BaseModel):
 
 
 class ClassifyResponse(BaseModel):
-    primary_task_class: Literal["formal", "coding", "research", "planning", "diagnosis", "transformation"]
-    secondary_task_class: Literal["formal", "coding", "research", "planning", "diagnosis", "transformation"] | None = None
+    primary_task_class: Literal[
+        "formal",
+        "coding",
+        "research",
+        "planning",
+        "diagnosis",
+        "transformation",
+    ]
+    secondary_task_class: Literal[
+        "formal",
+        "coding",
+        "research",
+        "planning",
+        "diagnosis",
+        "transformation",
+    ] | None = None
     difficulty: Literal["low", "medium", "high", "extreme"]
     stakes: Literal["low", "medium", "high"]
     route_confidence: Literal["low", "medium", "high"]
@@ -107,7 +127,12 @@ class ExecutionPlanResponse(BaseModel):
     hidden_trap_screen_required: bool = False
     popularity_check_required: bool = False
     freshness_check_required: bool = False
-    minimum_status_ceiling_without_tools: Literal["final", "provisional", "partial", "blocked"] = "final"
+    minimum_status_ceiling_without_tools: Literal[
+        "final",
+        "provisional",
+        "partial",
+        "blocked",
+    ] = "final"
     recommended_tools: list[str] = Field(default_factory=list)
     reason_tools_matter: list[str] = Field(default_factory=list)
 
@@ -206,15 +231,22 @@ class ExecutionReality(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class GroqAssist(BaseModel):
+    alt_interpretations: list[str] = Field(default_factory=list)
+    nonstandard_options: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    overturn_conditions: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
 class OrchestrateResponse(BaseModel):
     parsed: ParseResponse
     route: RouteResponse
     preflight: PreflightResponse
-    draft_answer: str | None = None
-    postcheck: PostcheckResponse | None = None
     telemetry_events: list[str] = Field(default_factory=list)
     applied_chat_brief: ChatBrief | None = None
     execution_reality: ExecutionReality | None = None
+    groq_assist: GroqAssist | None = None
 
 
 class TelemetryEvent(BaseModel):
