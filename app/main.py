@@ -10,6 +10,7 @@ from .schemas import (
     RouteResponse,
     PreflightResponse,
     ChatBrief,
+    GroqAssist,
 )
 
 from .graph import build_graph
@@ -50,6 +51,10 @@ def orchestrate(payload: OrchestrateRequest):
     if state.get("chat_brief"):
         brief = ChatBrief.model_validate(state["chat_brief"])
 
+    groq_assist = None
+    if isinstance(state.get("groq_assist"), dict):
+        groq_assist = GroqAssist.model_validate(state["groq_assist"])
+
     return OrchestrateResponse(
         parsed=parsed,
         route=route,
@@ -57,5 +62,5 @@ def orchestrate(payload: OrchestrateRequest):
         telemetry_events=preflight.defect_flags,
         applied_chat_brief=brief,
         execution_reality=ExecutionReality(),
-        groq_assist=state.get("groq_assist"),
+        groq_assist=groq_assist,
     )
