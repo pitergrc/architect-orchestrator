@@ -10,6 +10,12 @@ class HealthResponse(BaseModel):
     service: str = "architect-orchestrator"
 
 
+class PromptInput(BaseModel):
+    text: str = Field(..., description="Raw user message")
+    prior_route: str | None = None
+    prior_mode: str | None = None
+
+
 class ParseResponse(BaseModel):
     main_ask: str
     secondary_asks: list[str]
@@ -27,6 +33,11 @@ class ParseResponse(BaseModel):
     user_intent_mode: Literal["reference", "case_analysis", "tutor", "decision_support", "mixed"] = "mixed"
 
 
+class RouteRequest(BaseModel):
+    text: str
+    parsed: ParseResponse | None = None
+
+
 class RouteResponse(BaseModel):
     route: RouteType
     reasons: list[str] = Field(default_factory=list)
@@ -34,6 +45,19 @@ class RouteResponse(BaseModel):
     screening_required: bool = True
     default_depth_floor: Literal["standard", "deep"] = "standard"
     can_use_light_internal_path: bool = False
+
+
+class AskItem(BaseModel):
+    id: str
+    text: str
+    priority: Literal["high", "medium", "low"] = "medium"
+    droppable: bool = False
+
+
+class PreflightRequest(BaseModel):
+    text: str
+    parsed: ParseResponse | None = None
+    route: RouteType | None = None
 
 
 class PreflightResponse(BaseModel):
@@ -45,7 +69,7 @@ class PreflightResponse(BaseModel):
     prompt_coverage_required: bool = True
     audit_scope_resolver_active: bool = True
     defect_flags: list[str] = Field(default_factory=list)
-    ask_ledger: list[Any] = Field(default_factory=list)
+    ask_ledger: list[AskItem] = Field(default_factory=list)
     audit_hint: Literal["response_audit", "system_audit"] = "response_audit"
     task_profile: dict | None = None
     execution_flags: dict | None = None
@@ -54,14 +78,125 @@ class PreflightResponse(BaseModel):
     risk_flags: list[str] = Field(default_factory=list)
 
 
+class ClassifyResponse(BaseModel):
+    primary_task_class: Literal["formal", "coding", "research", "planning", "diagnosis", "transformation"]
+    secondary_task_class: Literal["formal", "coding", "research", "planning", "diagnosis", "transformation"] | None = None
+    difficulty: Literal["low", "medium", "high", "extreme"]
+    stakes: Literal["low", "medium", "high"]
+    route_confidence: Literal["low", "medium", "high"]
+    re_route_allowed: bool = True
+    hidden_trap_risk: Literal["low", "medium", "high"] = "low"
+    popularity_bias_risk: Literal["low", "medium", "high"] = "low"
+    evidence_debt: Literal["low", "medium", "high"] = "low"
+    freshness_need: Literal["low", "medium", "high"] = "low"
+    tool_need_likelihood: Literal["low", "medium", "high"] = "low"
+    deceptive_simple_risk: Literal["low", "medium", "high"] = "low"
+
+
+class ExecutionPlanResponse(BaseModel):
+    execution_mode: Literal["fast", "standard", "deep", "hybrid", "artifact_first"]
+    tool_mandatory: bool = False
+    verifier_required: bool = True
+    critic_required: bool = False
+    carryover_required: bool = False
+    constraints_check_required: bool = True
+    deployability_check_required: bool = False
+    max_passes: int = 2
+    max_repair_cycles: int = 1
+    deliverable_contract: Literal["answer", "plan", "spec", "memo", "patch", "report", "artifact"]
+    hidden_trap_screen_required: bool = False
+    popularity_check_required: bool = False
+    freshness_check_required: bool = False
+    minimum_status_ceiling_without_tools: Literal["final", "provisional", "partial", "blocked"] = "final"
+    recommended_tools: list[str] = Field(default_factory=list)
+    reason_tools_matter: list[str] = Field(default_factory=list)
+
+
+class ConstraintsCheckResponse(BaseModel):
+    hard_constraints: list[str] = Field(default_factory=list)
+    deployability_risk: Literal["low", "medium", "high"] = "low"
+    artifact_validation_required: bool = False
+    known_environment_limits: list[str] = Field(default_factory=list)
+    orchestration_limits: list[str] = Field(default_factory=list)
+    status_ceiling: Literal["final", "provisional", "partial", "blocked"] = "final"
+
+
+class ClassifyRequest(BaseModel):
+    text: str
+    parsed: ParseResponse | None = None
+
+
+class ExecutionPlanRequest(BaseModel):
+    text: str
+    parsed: ParseResponse | None = None
+    route: RouteResponse | None = None
+    classification: ClassifyResponse | None = None
+
+
+class ConstraintsCheckRequest(BaseModel):
+    text: str
+    parsed: ParseResponse | None = None
+    route: RouteResponse | None = None
+    classification: ClassifyResponse | None = None
+    execution: ExecutionPlanResponse | None = None
+
+
+class PostcheckRequest(BaseModel):
+    text: str
+    parsed: ParseResponse
+    route: RouteType
+    answer: str
+
+
+class PostcheckResponse(BaseModel):
+    ok: bool
+    events: list[str] = Field(default_factory=list)
+    missing_asks: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    issues: list[str] = Field(default_factory=list)
+    status_too_strong: bool = False
+    repair_needed: bool = False
+    recommended_status: Literal["final", "provisional", "partial", "blocked"] | None = None
+
+
 class ChatBrief(BaseModel):
-    main_ask: str | None = None
-    secondary_asks: list[str] = Field(default_factory=list)
-    constraints: list[str] = Field(default_factory=list)
-    strongest_alternative_interpretation: str | None = None
-    candidate_hypotheses: list[str] = Field(default_factory=list)
-    overturn_conditions: list[str] = Field(default_factory=list)
-    desired_output_shape: list[str] = Field(default_factory=list)
+    main_ask: str | None = Field(
+        default=None,
+        description="Best current restatement of the user's main ask after chat-side interpretation.",
+    )
+    secondary_asks: list[str] = Field(
+        default_factory=list,
+        description="Secondary asks that must not be lost.",
+    )
+    constraints: list[str] = Field(
+        default_factory=list,
+        description="Important user constraints already inferred on the chat side.",
+    )
+    strongest_alternative_interpretation: str | None = Field(
+        default=None,
+        description="Strongest alternative interpretation of the user's true goal.",
+    )
+    candidate_hypotheses: list[str] = Field(
+        default_factory=list,
+        description="2-4 candidate hypotheses, explanations, or attack angles proposed by chat-side reasoning.",
+    )
+    overturn_conditions: list[str] = Field(
+        default_factory=list,
+        description="Facts or conditions that could overturn the current leader.",
+    )
+    desired_output_shape: list[str] = Field(
+        default_factory=list,
+        description="Preferred answer shape, sections, or required components.",
+    )
+
+
+class OrchestrateRequest(BaseModel):
+    text: str
+    use_llm: bool = True
+    chat_brief: ChatBrief | None = Field(
+        default=None,
+        description="Optional structured pre-analysis generated by the chat-side model before orchestration.",
+    )
 
 
 class ExecutionReality(BaseModel):
@@ -71,25 +206,18 @@ class ExecutionReality(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
-class GroqAssist(BaseModel):
-    alt_interpretations: list[str] = Field(default_factory=list)
-    nonstandard_options: list[str] = Field(default_factory=list)
-    risks: list[str] = Field(default_factory=list)
-    overturn_conditions: list[str] = Field(default_factory=list)
-
-
-class OrchestrateRequest(BaseModel):
-    text: str
-    use_llm: bool = True
-    chat_brief: ChatBrief | None = None
-
-
 class OrchestrateResponse(BaseModel):
     parsed: ParseResponse
     route: RouteResponse
     preflight: PreflightResponse
+    draft_answer: str | None = None
+    postcheck: PostcheckResponse | None = None
     telemetry_events: list[str] = Field(default_factory=list)
     applied_chat_brief: ChatBrief | None = None
     execution_reality: ExecutionReality | None = None
-    groq_assist: GroqAssist | None = None
-       
+
+
+class TelemetryEvent(BaseModel):
+    event: str
+    route: str | None = None
+    payload: dict[str, Any] = Field(default_factory=dict)
