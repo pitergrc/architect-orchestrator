@@ -94,7 +94,16 @@ Route: {route.route}
     except:
         data = {}
 
-    state["groq_assist"] = data
+    if not isinstance(data, dict):
+        data = {}
+
+    state["groq_assist"] = {
+        "alt_interpretations": data.get("alt_interpretations", []),
+        "nonstandard_options": data.get("nonstandard_options", []),
+        "risks": data.get("risks", []),
+        "overturn_conditions": data.get("overturn_conditions", []),
+    }
+
     return state
 
 
