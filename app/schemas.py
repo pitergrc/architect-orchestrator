@@ -199,17 +199,24 @@ class OrchestrateRequest(BaseModel):
     )
 
 
+class ExecutionReality(BaseModel):
+    action_selected: bool = True
+    response_received: bool = True
+    draft_safe: bool = True
+    notes: list[str] = Field(default_factory=list)
+
+
 class OrchestrateResponse(BaseModel):
     parsed: ParseResponse
     route: RouteResponse
     preflight: PreflightResponse
-    draft_answer: str | None = None
-    postcheck: PostcheckResponse | None = None
     telemetry_events: list[str] = Field(default_factory=list)
     applied_chat_brief: ChatBrief | None = None
+    execution_reality: ExecutionReality | None = None
 
 
 class TelemetryEvent(BaseModel):
     event: str
     route: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
+       
