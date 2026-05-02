@@ -55,7 +55,10 @@ if PUBLIC_BASE_URL:
         servers=[{"url": PUBLIC_BASE_URL}],
     )
 else:
-    app = FastAPI(title="Architect Orchestrator", version="0.3.0")
+    app = FastAPI(
+        title="Architect Orchestrator",
+        version="0.3.0",
+    )
 
 
 @app.get("/health", response_model=HealthResponse, operation_id="healthCheck")
